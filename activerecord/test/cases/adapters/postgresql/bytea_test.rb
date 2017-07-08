@@ -47,7 +47,7 @@ class PostgresqlByteaTest < ActiveRecord::PostgreSQLTestCase
   end
 
   def test_type_cast_binary_value
-    data = "\u001F\x8B".force_encoding("BINARY")
+    data = "\u001F\x8B".dup.force_encoding("BINARY")
     assert_equal(data, @type.deserialize(data))
   end
 
@@ -96,7 +96,7 @@ class PostgresqlByteaTest < ActiveRecord::PostgreSQLTestCase
   end
 
   def test_write_binary
-    data = File.read(File.join(File.dirname(__FILE__), "..", "..", "..", "assets", "example.log"))
+    data = File.read(File.join(__dir__, "..", "..", "..", "assets", "example.log"))
     assert(data.size > 1)
     record = ByteaDataType.create(payload: data)
     assert_not record.new_record?

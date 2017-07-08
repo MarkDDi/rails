@@ -8,32 +8,70 @@ DEFAULT_APP_FILES = %w(
   Gemfile
   Rakefile
   config.ru
-  app/assets/javascripts
-  app/assets/stylesheets
+  app/assets/config/manifest.js
   app/assets/images
+  app/assets/javascripts
+  app/assets/javascripts/application.js
+  app/assets/javascripts/cable.js
+  app/assets/javascripts/channels
+  app/assets/stylesheets
+  app/assets/stylesheets/application.css
+  app/channels/application_cable/channel.rb
+  app/channels/application_cable/connection.rb
   app/controllers
+  app/controllers/application_controller.rb
   app/controllers/concerns
   app/helpers
+  app/helpers/application_helper.rb
   app/mailers
+  app/mailers/application_mailer.rb
   app/models
+  app/models/application_record.rb
   app/models/concerns
   app/jobs
+  app/jobs/application_job.rb
   app/views/layouts
+  app/views/layouts/application.html.erb
+  app/views/layouts/mailer.html.erb
+  app/views/layouts/mailer.text.erb
   bin/bundle
   bin/rails
   bin/rake
   bin/setup
-  config/environments
-  config/initializers
-  config/locales
+  bin/update
+  bin/yarn
+  config/application.rb
+  config/boot.rb
   config/cable.yml
+  config/environment.rb
+  config/environments
+  config/environments/development.rb
+  config/environments/production.rb
+  config/environments/test.rb
+  config/initializers
+  config/initializers/application_controller_renderer.rb
+  config/initializers/assets.rb
+  config/initializers/backtrace_silencers.rb
+  config/initializers/cookies_serializer.rb
+  config/initializers/filter_parameter_logging.rb
+  config/initializers/inflections.rb
+  config/initializers/mime_types.rb
+  config/initializers/wrap_parameters.rb
+  config/locales
+  config/locales/en.yml
   config/puma.rb
+  config/routes.rb
+  config/secrets.yml
   config/spring.rb
   db
+  db/seeds.rb
   lib
   lib/tasks
   lib/assets
   log
+  package.json
+  public
+  test/application_system_test_case.rb
   test/test_helper.rb
   test/fixtures
   test/fixtures/files
@@ -157,7 +195,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
   end
 
   def test_new_application_doesnt_need_defaults
-    assert_no_file "config/initializers/new_framework_defaults_5_1.rb"
+    assert_no_file "config/initializers/new_framework_defaults_5_2.rb"
   end
 
   def test_new_application_load_defaults
@@ -203,14 +241,14 @@ class AppGeneratorTest < Rails::Generators::TestCase
     app_root = File.join(destination_root, "myapp")
     run_generator [app_root]
 
-    assert_no_file "#{app_root}/config/initializers/new_framework_defaults_5_1.rb"
+    assert_no_file "#{app_root}/config/initializers/new_framework_defaults_5_2.rb"
 
     stub_rails_application(app_root) do
       generator = Rails::Generators::AppGenerator.new ["rails"], { update: true }, destination_root: app_root, shell: @shell
       generator.send(:app_const)
       quietly { generator.send(:update_config_files) }
 
-      assert_file "#{app_root}/config/initializers/new_framework_defaults_5_1.rb"
+      assert_file "#{app_root}/config/initializers/new_framework_defaults_5_2.rb"
     end
   end
 
@@ -410,14 +448,6 @@ class AppGeneratorTest < Rails::Generators::TestCase
       assert_no_match(/config\.assets\.js_compressor = :uglifier/, content)
       assert_no_match(/config\.assets\.css_compressor = :sass/, content)
     end
-    assert_no_file "config/initializers/new_framework_defaults_5_1.rb"
-  end
-
-  def test_generator_if_skip_yarn_is_given
-    run_generator [destination_root, "--skip-yarn"]
-
-    assert_no_file "package.json"
-    assert_no_file "bin/yarn"
   end
 
   def test_generator_if_skip_action_cable_is_given
@@ -445,10 +475,21 @@ class AppGeneratorTest < Rails::Generators::TestCase
   end
 
   def test_generator_if_skip_system_test_is_given
-    run_generator [destination_root, "--skip_system_test"]
+    run_generator [destination_root, "--skip-system-test"]
     assert_file "Gemfile" do |content|
       assert_no_match(/capybara/, content)
       assert_no_match(/selenium-webdriver/, content)
+    end
+  end
+
+  def test_does_not_generate_system_test_files_if_skip_system_test_is_given
+    run_generator [destination_root, "--skip-system-test"]
+
+    Dir.chdir(destination_root) do
+      quietly { `./bin/rails g scaffold User` }
+
+      assert_no_file("test/application_system_test_case.rb")
+      assert_no_file("test/system/users_test.rb")
     end
   end
 
@@ -465,7 +506,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
     if defined?(JRUBY_VERSION)
       assert_gem "therubyrhino"
     else
-      assert_file "Gemfile", /# gem 'therubyracer', platforms: :ruby/
+      assert_file "Gemfile", /# gem 'mini_racer', platforms: :ruby/
     end
   end
 
@@ -514,6 +555,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
   def test_generator_for_yarn_skipped
     run_generator([destination_root, "--skip-yarn"])
     assert_no_file "package.json"
+    assert_no_file "bin/yarn"
 
     assert_file "config/initializers/assets.rb" do |content|
       assert_no_match(/node_modules/, content)
@@ -559,9 +601,9 @@ class AppGeneratorTest < Rails::Generators::TestCase
     run_generator
     assert_file "config/environments/development.rb" do |content|
       if RbConfig::CONFIG["host_os"] =~ /darwin|linux/
-        assert_match(/^\s*config.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
+        assert_match(/^\s*config\.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
       else
-        assert_match(/^\s*# config.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
+        assert_match(/^\s*# config\.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
       end
     end
   end
@@ -629,7 +671,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
 
     assert_file "Gemfile" do |content|
       assert_match(/gem 'web-console',\s+github: 'rails\/web-console'/, content)
-      assert_no_match(/\Agem 'web-console', '>= 3.3.0'\z/, content)
+      assert_no_match(/\Agem 'web-console', '>= 3\.3\.0'\z/, content)
     end
   end
 
@@ -638,7 +680,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
 
     assert_file "Gemfile" do |content|
       assert_match(/gem 'web-console',\s+github: 'rails\/web-console'/, content)
-      assert_no_match(/\Agem 'web-console', '>= 3.3.0'\z/, content)
+      assert_no_match(/\Agem 'web-console', '>= 3\.3\.0'\z/, content)
     end
   end
 
@@ -777,7 +819,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
 
   def test_psych_gem
     run_generator
-    gem_regex = /gem 'psych',\s+'~> 2.0',\s+platforms: :rbx/
+    gem_regex = /gem 'psych',\s+'~> 2\.0',\s+platforms: :rbx/
 
     assert_file "Gemfile" do |content|
       if defined?(Rubinius)
@@ -860,7 +902,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
       assert_gem "spring-watcher-listen"
 
       assert_file "config/environments/development.rb" do |content|
-        assert_match(/^\s*config.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
+        assert_match(/^\s*config\.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
       end
     end
 
@@ -870,7 +912,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
       end
 
       assert_file "config/environments/development.rb" do |content|
-        assert_match(/^\s*# config.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
+        assert_match(/^\s*# config\.file_watcher = ActiveSupport::EventedFileUpdateChecker/, content)
       end
     end
 

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 require "active_support/core_ext/module/attribute_accessors"
-require "active_record/attribute_mutation_tracker"
+require_relative "../attribute_mutation_tracker"
 
 module ActiveRecord
   module AttributeMethods
@@ -14,8 +14,7 @@ module ActiveRecord
           raise "You cannot include Dirty after Timestamp"
         end
 
-        class_attribute :partial_writes, instance_writer: false
-        self.partial_writes = true
+        class_attribute :partial_writes, instance_writer: false, default: true
 
         after_create { changes_internally_applied }
         after_update { changes_internally_applied }

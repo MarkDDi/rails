@@ -13,7 +13,7 @@ class Post < ActiveRecord::Base
 
   module NamedExtension2
     def greeting
-      "hello"
+      "hullo"
     end
   end
 
@@ -22,6 +22,7 @@ class Post < ActiveRecord::Base
   scope :ranked_by_comments,      -> { order("comments_count DESC") }
 
   scope :limit_by, lambda { |l| limit(l) }
+  scope :locked, -> { lock }
 
   belongs_to :author
   belongs_to :readonly_author, -> { readonly }, class_name: "Author", foreign_key: :author_id

@@ -35,12 +35,10 @@ class EachTest < ActiveRecord::TestCase
     end
   end
 
-  if Enumerator.method_defined? :size
-    def test_each_should_return_a_sized_enumerator
-      assert_equal 11, Post.find_each(batch_size: 1).size
-      assert_equal 5, Post.find_each(batch_size:  2, start: 7).size
-      assert_equal 11, Post.find_each(batch_size: 10_000).size
-    end
+  def test_each_should_return_a_sized_enumerator
+    assert_equal 11, Post.find_each(batch_size: 1).size
+    assert_equal 5, Post.find_each(batch_size:  2, start: 7).size
+    assert_equal 11, Post.find_each(batch_size: 10_000).size
   end
 
   def test_each_enumerator_should_execute_one_query_per_batch
@@ -145,7 +143,7 @@ class EachTest < ActiveRecord::TestCase
 
   def test_find_in_batches_should_quote_batch_order
     c = Post.connection
-    assert_sql(/ORDER BY #{c.quote_table_name('posts')}.#{c.quote_column_name('id')}/) do
+    assert_sql(/ORDER BY #{c.quote_table_name('posts')}\.#{c.quote_column_name('id')}/) do
       Post.find_in_batches(batch_size: 1) do |batch|
         assert_kind_of Array, batch
         assert_kind_of Post, batch.first
@@ -154,7 +152,7 @@ class EachTest < ActiveRecord::TestCase
   end
 
   def test_find_in_batches_should_not_use_records_after_yielding_them_in_case_original_array_is_modified
-    not_a_post = "not a post"
+    not_a_post = "not a post".dup
     def not_a_post.id; end
     not_a_post.stub(:id, -> { raise StandardError.new("not_a_post had #id called on it") }) do
       assert_nothing_raised do
@@ -410,7 +408,7 @@ class EachTest < ActiveRecord::TestCase
 
   def test_in_batches_should_quote_batch_order
     c = Post.connection
-    assert_sql(/ORDER BY #{c.quote_table_name('posts')}.#{c.quote_column_name('id')}/) do
+    assert_sql(/ORDER BY #{c.quote_table_name('posts')}\.#{c.quote_column_name('id')}/) do
       Post.in_batches(of: 1) do |relation|
         assert_kind_of ActiveRecord::Relation, relation
         assert_kind_of Post, relation.first
@@ -419,7 +417,7 @@ class EachTest < ActiveRecord::TestCase
   end
 
   def test_in_batches_should_not_use_records_after_yielding_them_in_case_original_array_is_modified
-    not_a_post = "not a post"
+    not_a_post = "not a post".dup
     def not_a_post.id
       raise StandardError.new("not_a_post had #id called on it")
     end
@@ -515,14 +513,12 @@ class EachTest < ActiveRecord::TestCase
     assert_equal 2, person.reload.author_id # incremented only once
   end
 
-  if Enumerator.method_defined? :size
-    def test_find_in_batches_should_return_a_sized_enumerator
-      assert_equal 11, Post.find_in_batches(batch_size: 1).size
-      assert_equal 6, Post.find_in_batches(batch_size: 2).size
-      assert_equal 4, Post.find_in_batches(batch_size: 2, start: 4).size
-      assert_equal 4, Post.find_in_batches(batch_size: 3).size
-      assert_equal 1, Post.find_in_batches(batch_size: 10_000).size
-    end
+  def test_find_in_batches_should_return_a_sized_enumerator
+    assert_equal 11, Post.find_in_batches(batch_size: 1).size
+    assert_equal 6, Post.find_in_batches(batch_size: 2).size
+    assert_equal 4, Post.find_in_batches(batch_size: 2, start: 4).size
+    assert_equal 4, Post.find_in_batches(batch_size: 3).size
+    assert_equal 1, Post.find_in_batches(batch_size: 10_000).size
   end
 
   [true, false].each do |load|

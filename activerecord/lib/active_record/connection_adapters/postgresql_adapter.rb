@@ -2,20 +2,20 @@
 gem "pg", "~> 0.18"
 require "pg"
 
-require "active_record/connection_adapters/abstract_adapter"
-require "active_record/connection_adapters/statement_pool"
-require "active_record/connection_adapters/postgresql/column"
-require "active_record/connection_adapters/postgresql/database_statements"
-require "active_record/connection_adapters/postgresql/explain_pretty_printer"
-require "active_record/connection_adapters/postgresql/oid"
-require "active_record/connection_adapters/postgresql/quoting"
-require "active_record/connection_adapters/postgresql/referential_integrity"
-require "active_record/connection_adapters/postgresql/schema_creation"
-require "active_record/connection_adapters/postgresql/schema_definitions"
-require "active_record/connection_adapters/postgresql/schema_dumper"
-require "active_record/connection_adapters/postgresql/schema_statements"
-require "active_record/connection_adapters/postgresql/type_metadata"
-require "active_record/connection_adapters/postgresql/utils"
+require_relative "abstract_adapter"
+require_relative "statement_pool"
+require_relative "postgresql/column"
+require_relative "postgresql/database_statements"
+require_relative "postgresql/explain_pretty_printer"
+require_relative "postgresql/oid"
+require_relative "postgresql/quoting"
+require_relative "postgresql/referential_integrity"
+require_relative "postgresql/schema_creation"
+require_relative "postgresql/schema_definitions"
+require_relative "postgresql/schema_dumper"
+require_relative "postgresql/schema_statements"
+require_relative "postgresql/type_metadata"
+require_relative "postgresql/utils"
 
 module ActiveRecord
   module ConnectionHandling # :nodoc:
@@ -120,12 +120,6 @@ module ActiveRecord
       include PostgreSQL::SchemaStatements
       include PostgreSQL::DatabaseStatements
       include PostgreSQL::ColumnDumper
-
-      # Returns true, since this connection adapter supports prepared statement
-      # caching.
-      def supports_statement_cache?
-        true
-      end
 
       def supports_index_sort_order?
         true
@@ -314,24 +308,18 @@ module ActiveRecord
         postgresql_version >= 90400
       end
 
-      def supports_alter_constraint?
-        # PostgreSQL 9.4 introduces ALTER TABLE ... ALTER CONSTRAINT but it has a bug and fixed in 9.4.2
-        # https://www.postgresql.org/docs/9.4/static/release-9-4-2.html
-        postgresql_version >= 90402
-      end
-
       def get_advisory_lock(lock_id) # :nodoc:
         unless lock_id.is_a?(Integer) && lock_id.bit_length <= 63
           raise(ArgumentError, "Postgres requires advisory lock ids to be a signed 64 bit integer")
         end
-        select_value("SELECT pg_try_advisory_lock(#{lock_id});")
+        query_value("SELECT pg_try_advisory_lock(#{lock_id})")
       end
 
       def release_advisory_lock(lock_id) # :nodoc:
         unless lock_id.is_a?(Integer) && lock_id.bit_length <= 63
           raise(ArgumentError, "Postgres requires advisory lock ids to be a signed 64 bit integer")
         end
-        select_value("SELECT pg_advisory_unlock(#{lock_id})")
+        query_value("SELECT pg_advisory_unlock(#{lock_id})")
       end
 
       def enable_extension(name)
@@ -348,15 +336,14 @@ module ActiveRecord
 
       def extension_enabled?(name)
         if supports_extensions?
-          res = exec_query "SELECT EXISTS(SELECT * FROM pg_available_extensions WHERE name = '#{name}' AND installed_version IS NOT NULL) as enabled",
-            "SCHEMA"
+          res = exec_query("SELECT EXISTS(SELECT * FROM pg_available_extensions WHERE name = '#{name}' AND installed_version IS NOT NULL) as enabled", "SCHEMA")
           res.cast_values.first
         end
       end
 
       def extensions
         if supports_extensions?
-          exec_query("SELECT extname from pg_extension", "SCHEMA").cast_values
+          exec_query("SELECT extname FROM pg_extension", "SCHEMA").cast_values
         else
           super
         end
@@ -364,14 +351,14 @@ module ActiveRecord
 
       # Returns the configured supported identifier length supported by PostgreSQL
       def table_alias_length
-        @max_identifier_length ||= select_value("SHOW max_identifier_length", "SCHEMA").to_i
+        @max_identifier_length ||= query_value("SHOW max_identifier_length", "SCHEMA").to_i
       end
       alias index_name_length table_alias_length
 
       # Set the authorized user for this session
       def session_auth=(user)
         clear_cache!
-        exec_query "SET SESSION AUTHORIZATION #{user}"
+        execute("SET SESSION AUTHORIZATION #{user}")
       end
 
       def use_insert_returning?
@@ -470,7 +457,7 @@ module ActiveRecord
           m.register_type "bytea", OID::Bytea.new
           m.register_type "point", OID::Point.new
           m.register_type "hstore", OID::Hstore.new
-          m.register_type "json", OID::Json.new
+          m.register_type "json", Type::Json.new
           m.register_type "jsonb", OID::Jsonb.new
           m.register_type "cidr", OID::Cidr.new
           m.register_type "inet", OID::Inet.new
@@ -561,7 +548,7 @@ module ActiveRecord
         end
 
         def has_default_function?(default_value, default)
-          !default_value && (%r{\w+\(.*\)|\(.*\)::\w+} === default)
+          !default_value && %r{\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP}.match?(default)
         end
 
         def load_additional_types(type_map, oids = nil)
@@ -735,11 +722,6 @@ module ActiveRecord
           end
         end
 
-        # Returns the current ID of a table's sequence.
-        def last_insert_id_result(sequence_name)
-          exec_query("SELECT currval('#{sequence_name}')", "SQL")
-        end
-
         # Returns the list of a table's column names, data types, and default values.
         #
         # The underlying query is roughly:
@@ -855,7 +837,6 @@ module ActiveRecord
         ActiveRecord::Type.register(:enum, OID::Enum, adapter: :postgresql)
         ActiveRecord::Type.register(:hstore, OID::Hstore, adapter: :postgresql)
         ActiveRecord::Type.register(:inet, OID::Inet, adapter: :postgresql)
-        ActiveRecord::Type.register(:json, OID::Json, adapter: :postgresql)
         ActiveRecord::Type.register(:jsonb, OID::Jsonb, adapter: :postgresql)
         ActiveRecord::Type.register(:money, OID::Money, adapter: :postgresql)
         ActiveRecord::Type.register(:point, OID::Point, adapter: :postgresql)

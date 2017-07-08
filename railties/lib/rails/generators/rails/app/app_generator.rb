@@ -1,4 +1,4 @@
-require "rails/generators/app_base"
+require_relative "../../app_base"
 
 module Rails
   module ActionMethods # :nodoc:
@@ -67,6 +67,10 @@ module Rails
       end
     end
 
+    def package_json
+      template "package.json"
+    end
+
     def app
       directory "app"
 
@@ -117,7 +121,6 @@ module Rails
       action_cable_config_exist = File.exist?("config/cable.yml")
       rack_cors_config_exist = File.exist?("config/initializers/cors.rb")
       assets_config_exist = File.exist?("config/initializers/assets.rb")
-      new_framework_defaults_5_1_exist = File.exist?("config/initializers/new_framework_defaults_5_1.rb")
 
       config
 
@@ -140,12 +143,6 @@ module Rails
 
         unless assets_config_exist
           remove_file "config/initializers/assets.rb"
-        end
-
-        # Sprockets owns the only new default for 5.1:
-        # In API-only Applications, we don't want the file.
-        unless new_framework_defaults_5_1_exist
-          remove_file "config/initializers/new_framework_defaults_5_1.rb"
         end
       end
     end
@@ -198,20 +195,18 @@ module Rails
 
     def vendor
       empty_directory_with_keep_file "vendor"
-
-      unless options[:skip_yarn]
-        template "package.json"
-      end
     end
   end
 
   module Generators
     # We need to store the RAILS_DEV_PATH in a constant, otherwise the path
     # can change in Ruby 1.8.7 when we FileUtils.cd.
-    RAILS_DEV_PATH = File.expand_path("../../../../../..", File.dirname(__FILE__))
+    RAILS_DEV_PATH = File.expand_path("../../../../../..", __dir__)
     RESERVED_NAMES = %w[application destroy plugin runner test]
 
     class AppGenerator < AppBase # :nodoc:
+      WEBPACKS = %w( react vue angular elm )
+
       add_shared_options_for "application"
 
       # Add bin/rails options
@@ -223,6 +218,9 @@ module Rails
 
       class_option :skip_bundle, type: :boolean, aliases: "-B", default: false,
                                  desc: "Don't run bundle install"
+
+      class_option :webpack, type: :string, default: nil,
+                             desc: "Preconfigure for app-like JavaScript with Webpack (options: #{WEBPACKS.join('/')})"
 
       def initialize(*args)
         super
@@ -248,6 +246,7 @@ module Rails
         build(:gitignore)   unless options[:skip_git]
         build(:gemfile)     unless options[:skip_gemfile]
         build(:version_control)
+        build(:package_json) unless options[:skip_yarn]
       end
 
       def create_app_files
@@ -317,10 +316,6 @@ module Rails
 
       def create_vendor_files
         build(:vendor)
-
-        if options[:skip_yarn]
-          remove_file "package.json"
-        end
       end
 
       def delete_app_assets_if_api_option
@@ -403,10 +398,8 @@ module Rails
       end
 
       def delete_new_framework_defaults
-        # Sprockets owns the only new default for 5.1: if it's disabled,
-        # we don't want the file.
-        unless options[:update] && !options[:skip_sprockets]
-          remove_file "config/initializers/new_framework_defaults_5_1.rb"
+        unless options[:update]
+          remove_file "config/initializers/new_framework_defaults_5_2.rb"
         end
       end
 
@@ -522,7 +515,7 @@ module Rails
 
         def handle_version_request!(argument)
           if ["--version", "-v"].include?(argument)
-            require "rails/version"
+            require_relative "../../../version"
             puts "Rails #{Rails::VERSION::STRING}"
             exit(0)
           end

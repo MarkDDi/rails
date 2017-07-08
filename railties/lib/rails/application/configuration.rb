@@ -1,7 +1,7 @@
 require "active_support/core_ext/kernel/reporting"
 require "active_support/file_update_checker"
-require "rails/engine/configuration"
-require "rails/source_annotation_extractor"
+require_relative "../engine/configuration"
+require_relative "../source_annotation_extractor"
 
 module Rails
   class Application
@@ -77,8 +77,24 @@ module Rails
             assets.unknown_asset_fallback = false
           end
 
+          if respond_to?(:action_view)
+            action_view.form_with_generates_remote_forms = true
+          end
+
         when "5.2"
           load_defaults "5.1"
+
+          if respond_to?(:active_record)
+            active_record.cache_versioning = true
+          end
+
+          if respond_to?(:action_dispatch)
+            action_dispatch.use_authenticated_cookie_encryption = true
+          end
+
+          if respond_to?(:active_support)
+            active_support.use_authenticated_message_encryption = true
+          end
 
         else
           raise "Unknown version #{target_version.to_s.inspect}"
@@ -133,7 +149,14 @@ module Rails
         config = if yaml && yaml.exist?
           require "yaml"
           require "erb"
-          YAML.load(ERB.new(yaml.read).result) || {}
+          loaded_yaml = YAML.load(ERB.new(yaml.read).result) || {}
+          shared = loaded_yaml.delete("shared")
+          if shared
+            loaded_yaml.each do |_k, values|
+              values.reverse_merge!(shared)
+            end
+          end
+          Hash.new(shared).merge(loaded_yaml)
         elsif ENV["DATABASE_URL"]
           # Value from ENV['DATABASE_URL'] is set to default database connection
           # by Active Record.

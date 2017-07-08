@@ -594,7 +594,7 @@ class RelationTest < ActiveRecord::TestCase
     end
   end
 
-  def test_respond_to_delegates_to_relation
+  def test_respond_to_delegates_to_arel
     relation = Topic.all
     fake_arel = Struct.new(:responds) {
       def respond_to?(method, access = false)
@@ -607,10 +607,6 @@ class RelationTest < ActiveRecord::TestCase
 
     relation.respond_to?(:matching_attributes)
     assert_equal [:matching_attributes, false], fake_arel.responds.first
-
-    fake_arel.responds = []
-    relation.respond_to?(:matching_attributes, true)
-    assert_equal [:matching_attributes, true], fake_arel.responds.first
   end
 
   def test_respond_to_dynamic_finders
@@ -697,16 +693,6 @@ class RelationTest < ActiveRecord::TestCase
       assert posts.first.author
       assert posts.first.comments.first
     end
-  end
-
-  def test_default_scope_with_conditions_string
-    assert_equal Developer.where(name: "David").map(&:id).sort, DeveloperCalledDavid.all.map(&:id).sort
-    assert_nil DeveloperCalledDavid.create!.name
-  end
-
-  def test_default_scope_with_conditions_hash
-    assert_equal Developer.where(name: "Jamis").map(&:id).sort, DeveloperCalledJamis.all.map(&:id).sort
-    assert_equal "Jamis", DeveloperCalledJamis.create!.name
   end
 
   def test_default_scoping_finder_methods
@@ -1731,6 +1717,9 @@ class RelationTest < ActiveRecord::TestCase
     scope = Post.order("comments.body")
     assert_equal ["comments"], scope.references_values
 
+    scope = Post.order("#{Comment.quoted_table_name}.#{Comment.quoted_primary_key}")
+    assert_equal ["comments"], scope.references_values
+
     scope = Post.order("comments.body", "yaks.body")
     assert_equal ["comments", "yaks"], scope.references_values
 
@@ -1748,6 +1737,9 @@ class RelationTest < ActiveRecord::TestCase
   def test_automatically_added_reorder_references
     scope = Post.reorder("comments.body")
     assert_equal %w(comments), scope.references_values
+
+    scope = Post.reorder("#{Comment.quoted_table_name}.#{Comment.quoted_primary_key}")
+    assert_equal ["comments"], scope.references_values
 
     scope = Post.reorder("comments.body", "yaks.body")
     assert_equal %w(comments yaks), scope.references_values
@@ -1985,24 +1977,28 @@ class RelationTest < ActiveRecord::TestCase
   end
 
   def test_unscope_removes_binds
-    left = Post.where(id: Arel::Nodes::BindParam.new)
-    column = Post.columns_hash["id"]
-    left.bind_values += [[column, 20]]
+    left = Post.where(id: 20)
+
+    binds = [bind_attribute("id", 20, Post.type_for_attribute("id"))]
+    assert_equal binds, left.bound_attributes
 
     relation = left.unscope(where: :id)
-    assert_equal [], relation.bind_values
+    assert_equal [], relation.bound_attributes
   end
 
-  def test_merging_removes_rhs_bind_parameters
+  def test_merging_removes_rhs_binds
     left = Post.where(id: 20)
     right = Post.where(id: [1, 2, 3, 4])
 
+    binds = [bind_attribute("id", 20, Post.type_for_attribute("id"))]
+    assert_equal binds, left.bound_attributes
+
     merged = left.merge(right)
-    assert_equal [], merged.bind_values
+    assert_equal [], merged.bound_attributes
   end
 
-  def test_merging_keeps_lhs_bind_parameters
-    binds = [ActiveRecord::Relation::QueryAttribute.new("id", 20, Post.type_for_attribute("id"))]
+  def test_merging_keeps_lhs_binds
+    binds = [bind_attribute("id", 20, Post.type_for_attribute("id"))]
 
     right  = Post.where(id: 20)
     left   = Post.where(id: 10)
@@ -2011,13 +2007,10 @@ class RelationTest < ActiveRecord::TestCase
     assert_equal binds, merged.bound_attributes
   end
 
-  def test_merging_reorders_bind_params
-    post  = Post.first
-    right = Post.where(id: post.id)
-    left  = Post.where(title: post.title)
-
-    merged = left.merge(right)
-    assert_equal post, merged.first
+  def test_locked_should_not_build_arel
+    posts = Post.locked
+    assert posts.locked?
+    assert_nothing_raised { posts.lock!(false) }
   end
 
   def test_relation_join_method

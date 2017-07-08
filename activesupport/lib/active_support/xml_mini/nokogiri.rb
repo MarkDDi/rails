@@ -4,7 +4,7 @@ rescue LoadError => e
   $stderr.puts "You don't have nokogiri installed in your application. Please add it to your Gemfile and run bundle install"
   raise e
 end
-require "active_support/core_ext/object/blank"
+require_relative "../core_ext/object/blank"
 require "stringio"
 
 module ActiveSupport
@@ -19,11 +19,9 @@ module ActiveSupport
         data = StringIO.new(data || "")
       end
 
-      char = data.getc
-      if char.nil?
+      if data.eof?
         {}
       else
-        data.ungetc(char)
         doc = Nokogiri::XML(data)
         raise doc.errors.first if doc.errors.length > 0
         doc.to_hash
@@ -59,7 +57,7 @@ module ActiveSupport
             if c.element?
               c.to_hash(node_hash)
             elsif c.text? || c.cdata?
-              node_hash[CONTENT_ROOT] ||= ""
+              node_hash[CONTENT_ROOT] ||= "".dup
               node_hash[CONTENT_ROOT] << c.content
             end
           end

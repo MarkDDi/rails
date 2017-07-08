@@ -1,6 +1,6 @@
 gem "minitest"
 require "minitest"
-require "rails/test_unit/minitest_plugin"
+require_relative "minitest_plugin"
 
 task default: :test
 
@@ -48,6 +48,7 @@ namespace :test do
     Minitest.rake_run(["test/controllers", "test/mailers", "test/functional"])
   end
 
+  desc "Run system tests only"
   task system: "test:prepare" do
     $: << "test"
     Minitest.rake_run(["test/system"])

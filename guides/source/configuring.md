@@ -157,8 +157,6 @@ defaults to `:debug` for all environments. The available log levels are: `:debug
 * `config.assets.enabled` a flag that controls whether the asset
 pipeline is enabled. It is set to `true` by default.
 
-* `config.assets.raise_runtime_errors` Set this flag to `true` to enable additional runtime error checking. Recommended in `config/environments/development.rb` to minimize unexpected behavior when deploying to `production`.
-
 * `config.assets.css_compressor` defines the CSS compressor to use. It is set by default by `sass-rails`. The unique alternative value at the moment is `:yui`, which uses the `yui-compressor` gem.
 
 * `config.assets.js_compressor` defines the JavaScript compressor to use. Possible values are `:closure`, `:uglifier` and `:yui` which require the use of the `closure-compiler`, `uglifier` or `yui-compressor` gems respectively.
@@ -456,10 +454,14 @@ to `'http authentication'`.
 Defaults to `'signed cookie'`.
 
 * `config.action_dispatch.encrypted_cookie_salt` sets the encrypted cookies salt
-value. Defaults to `'encrypted cookie'`.
+  value. Defaults to `'encrypted cookie'`.
 
 * `config.action_dispatch.encrypted_signed_cookie_salt` sets the signed
-encrypted cookies salt value. Defaults to `'signed encrypted cookie'`.
+  encrypted cookies salt value. Defaults to `'signed encrypted cookie'`.
+
+* `config.action_dispatch.authenticated_encrypted_cookie_salt` sets the
+  authenticated encrypted cookie salt. Defaults to `'authenticated encrypted
+  cookie'`.
 
 * `config.action_dispatch.perform_deep_munge` configures whether `deep_munge`
   method should be performed on the parameters. See [Security Guide](security.html#unsafe-query-generation)
@@ -492,8 +494,6 @@ encrypted cookies salt value. Defaults to `'signed encrypted cookie'`.
   Any exceptions that are not configured will be mapped to 500 Internal Server Error.
 
 * `ActionDispatch::Callbacks.before` takes a block of code to run before the request.
-
-* `ActionDispatch::Callbacks.to_prepare` takes a block to run after `ActionDispatch::Callbacks.before`, but before the request. Runs for every request in `development` mode, but only once for `production` or environments with `cache_classes` set to `true`.
 
 * `ActionDispatch::Callbacks.after` takes a block of code to run after the request.
 
@@ -542,6 +542,8 @@ encrypted cookies salt value. Defaults to `'signed encrypted cookie'`.
   submit_tag should automatically disable on click, this defaults to `true`.
 
 * `config.action_view.debug_missing_translation` determines whether to wrap the missing translations key in a `<span>` tag or not. This defaults to `true`.
+
+* `config.action_view.form_with_generates_remote_forms` determines whether `form_with` generates remote forms or not. This defaults to `true`.
 
 ### Configuring Action Mailer
 
@@ -1186,7 +1188,7 @@ Below is a comprehensive list of all the initializers found in Rails in the orde
 
 * `finisher_hook`: Provides a hook for after the initialization of process of the application is complete, as well as running all the `config.after_initialize` blocks for the application, railties and engines.
 
-* `set_routes_reloader_hook`: Configures Action Dispatch to reload the routes file using `ActionDispatch::Callbacks.to_prepare`.
+* `set_routes_reloader_hook`: Configures Action Dispatch to reload the routes file using `ActiveSupport::Callbacks.to_run`.
 
 * `disable_dependency_loading`: Disables the automatic dependency loading if the `config.eager_load` is set to `true`.
 

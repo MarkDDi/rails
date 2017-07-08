@@ -11,12 +11,13 @@ gem "arel", github: "rails/arel"
 
 # We need a newish Rake since Active Job sets its test tasks' descriptions.
 gem "rake", ">= 11.1"
+gem "thor", github: "erikhuda/thor"
 
 # This needs to be with require false to ensure correct loading order, as it has to
 # be loaded after loading the test library.
 gem "mocha", "~> 0.14", require: false
 
-gem "capybara", "~> 2.13.0"
+gem "capybara", "~> 2.13"
 
 gem "rack-cache", "~> 1.2"
 gem "jquery-rails"
@@ -33,16 +34,13 @@ gem "bcrypt", "~> 3.1.11", require: false
 # sprockets.
 gem "uglifier", ">= 1.3.0", require: false
 
-# FIXME: Remove this fork after https://github.com/nex3/rb-inotify/pull/49 is fixed.
-gem "rb-inotify", github: "matthewd/rb-inotify", branch: "close-handling", require: false
-
 # Explicitly avoid 1.x that doesn't support Ruby 2.4+
 gem "json", ">= 2.0.0"
 
 gem "rubocop", ">= 0.47", require: false
 
 group :doc do
-  gem "sdoc", "1.0.0.rc1"
+  gem "sdoc", "> 1.0.0.rc1", "< 2.0"
   gem "redcarpet", "~> 3.2.3", platforms: :ruby
   gem "w3c_validators"
   gem "kindlerb", "~> 1.2.0"
@@ -90,7 +88,7 @@ group :cable do
 end
 
 # Add your own local bundler stuff.
-local_gemfile = File.dirname(__FILE__) + "/.Gemfile"
+local_gemfile = File.expand_path(".Gemfile", __dir__)
 instance_eval File.read local_gemfile if File.exist? local_gemfile
 
 group :test do

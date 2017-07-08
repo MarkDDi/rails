@@ -5,7 +5,7 @@ require "active_support/core_ext/object/try"
 require "rack/test"
 require "minitest"
 
-require "action_dispatch/testing/request_encoder"
+require_relative "request_encoder"
 
 module ActionDispatch
   module Integration #:nodoc:
@@ -338,8 +338,7 @@ module ActionDispatch
         @integration_session = nil
       end
 
-      %w(get post patch put head delete cookies assigns
-         xml_http_request xhr get_via_redirect post_via_redirect).each do |method|
+      %w(get post patch put head delete cookies assigns follow_redirect!).each do |method|
         define_method(method) do |*args|
           # reset the html_document variable, except for cookies/assigns calls
           unless method == "cookies" || method == "assigns"
@@ -385,14 +384,15 @@ module ActionDispatch
         integration_session.default_url_options = options
       end
 
-      def respond_to_missing?(method, include_private = false)
-        integration_session.respond_to?(method, include_private) || super
+    private
+      def respond_to_missing?(method, _)
+        integration_session.respond_to?(method) || super
       end
 
       # Delegate unhandled messages to the current session instance.
-      def method_missing(sym, *args, &block)
-        if integration_session.respond_to?(sym)
-          integration_session.__send__(sym, *args, &block).tap do
+      def method_missing(method, *args, &block)
+        if integration_session.respond_to?(method)
+          integration_session.public_send(method, *args, &block).tap do
             copy_session_variables!
           end
         else

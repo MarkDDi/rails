@@ -1,7 +1,7 @@
-require "active_record/relation/from_clause"
-require "active_record/relation/query_attribute"
-require "active_record/relation/where_clause"
-require "active_record/relation/where_clause_factory"
+require_relative "from_clause"
+require_relative "query_attribute"
+require_relative "where_clause"
+require_relative "where_clause_factory"
 require "active_model/forbidden_attributes_protection"
 
 module ActiveRecord
@@ -248,7 +248,7 @@ module ActiveRecord
         return super()
       end
 
-      raise ArgumentError, "Call this with at least one field" if fields.empty?
+      raise ArgumentError, "Call `select' with at least one field" if fields.empty?
       spawn._select!(*fields)
     end
 
@@ -1100,14 +1100,16 @@ module ActiveRecord
       end
 
       VALID_DIRECTIONS = [:asc, :desc, :ASC, :DESC,
-                          "asc", "desc", "ASC", "DESC"] # :nodoc:
+                          "asc", "desc", "ASC", "DESC"].to_set # :nodoc:
 
       def validate_order_args(args)
         args.each do |arg|
           next unless arg.is_a?(Hash)
           arg.each do |_key, value|
-            raise ArgumentError, "Direction \"#{value}\" is invalid. Valid " \
-                                 "directions are: #{VALID_DIRECTIONS.inspect}" unless VALID_DIRECTIONS.include?(value)
+            unless VALID_DIRECTIONS.include?(value)
+              raise ArgumentError,
+                "Direction \"#{value}\" is invalid. Valid directions are: #{VALID_DIRECTIONS.to_a.inspect}"
+            end
           end
         end
       end
@@ -1120,7 +1122,7 @@ module ActiveRecord
         validate_order_args(order_args)
 
         references = order_args.grep(String)
-        references.map! { |arg| arg =~ /^([a-zA-Z]\w*)\.(\w+)/ && $1 }.compact!
+        references.map! { |arg| arg =~ /^\W?(\w+)\W?\./ && $1 }.compact!
         references!(references) if references.any?
 
         # if a symbol is given we prepend the quoted table name
@@ -1165,7 +1167,7 @@ module ActiveRecord
         end
       end
 
-      STRUCTURAL_OR_METHODS = Relation::VALUE_METHODS - [:extending, :where, :having]
+      STRUCTURAL_OR_METHODS = Relation::VALUE_METHODS - [:extending, :where, :having, :unscope]
       def structurally_incompatible_values_for_or(other)
         STRUCTURAL_OR_METHODS.reject do |method|
           get_value(method) == other.get_value(method)

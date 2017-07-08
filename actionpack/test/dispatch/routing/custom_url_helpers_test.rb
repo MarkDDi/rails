@@ -165,8 +165,8 @@ class TestCustomUrlHelpers < ActionDispatch::IntegrationTest
 
     assert_equal "/", params_path(@safe_params)
     assert_equal "/", Routes.url_helpers.params_path(@safe_params)
-    assert_raises(ArgumentError) { params_path(@unsafe_params) }
-    assert_raises(ArgumentError) { Routes.url_helpers.params_path(@unsafe_params) }
+    assert_raises(ActionController::UnfilteredParameters) { params_path(@unsafe_params) }
+    assert_raises(ActionController::UnfilteredParameters) { Routes.url_helpers.params_path(@unsafe_params) }
 
     assert_equal "/basket", symbol_path
     assert_equal "/basket", Routes.url_helpers.symbol_path
@@ -208,8 +208,8 @@ class TestCustomUrlHelpers < ActionDispatch::IntegrationTest
 
     assert_equal "http://www.example.com/", params_url(@safe_params)
     assert_equal "http://www.example.com/", Routes.url_helpers.params_url(@safe_params)
-    assert_raises(ArgumentError) { params_url(@unsafe_params) }
-    assert_raises(ArgumentError) { Routes.url_helpers.params_url(@unsafe_params) }
+    assert_raises(ActionController::UnfilteredParameters) { params_url(@unsafe_params) }
+    assert_raises(ActionController::UnfilteredParameters) { Routes.url_helpers.params_url(@unsafe_params) }
 
     assert_equal "http://www.example.com/basket", symbol_url
     assert_equal "http://www.example.com/basket", Routes.url_helpers.symbol_url
@@ -321,5 +321,11 @@ class TestCustomUrlHelpers < ActionDispatch::IntegrationTest
         end
       end
     end
+  end
+
+  def test_defining_direct_url_registers_helper_method
+    assert_equal "http://www.example.com/basket", Routes.url_helpers.symbol_url
+    assert_equal true, Routes.named_routes.route_defined?(:symbol_url), "'symbol_url' named helper not found"
+    assert_equal true, Routes.named_routes.route_defined?(:symbol_path), "'symbol_path' named helper not found"
   end
 end

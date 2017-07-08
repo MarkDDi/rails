@@ -326,15 +326,15 @@ module Mime
 
     def ref; end
 
-    def respond_to_missing?(method, include_private = false)
-      method.to_s.ends_with? "?"
-    end
-
     private
+      def respond_to_missing?(method, _)
+        method.to_s.ends_with? "?"
+      end
+
       def method_missing(method, *args)
         false if method.to_s.ends_with? "?"
       end
   end
 end
 
-require "action_dispatch/http/mime_types"
+require_relative "mime_types"

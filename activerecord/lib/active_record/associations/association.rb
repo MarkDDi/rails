@@ -30,14 +30,6 @@ module ActiveRecord
         reset_scope
       end
 
-      # Returns the name of the table of the associated class:
-      #
-      #   post.comments.aliased_table_name # => "comments"
-      #
-      def aliased_table_name
-        klass.table_name
-      end
-
       # Resets the \loaded flag to +false+ and sets the \target to +nil+.
       def reset
         @loaded = false
@@ -94,7 +86,7 @@ module ActiveRecord
       # actually gets built.
       def association_scope
         if klass
-          @association_scope ||= AssociationScope.scope(self, klass.connection)
+          @association_scope ||= AssociationScope.scope(self)
         end
       end
 
@@ -133,6 +125,16 @@ module ActiveRecord
         AssociationRelation.create(klass, klass.arel_table, klass.predicate_builder, self).merge!(klass.all)
       end
 
+      def extensions
+        extensions = klass.default_extensions | reflection.extensions
+
+        if scope = reflection.scope
+          extensions |= klass.unscoped.instance_exec(owner, &scope).extensions
+        end
+
+        extensions
+      end
+
       # Loads the \target if needed and returns it.
       #
       # This method is abstract in the sense that it relies on +find_target+,
@@ -150,14 +152,6 @@ module ActiveRecord
         target
       rescue ActiveRecord::RecordNotFound
         reset
-      end
-
-      def interpolate(sql, record = nil)
-        if sql.respond_to?(:to_proc)
-          owner.instance_exec(record, &sql)
-        else
-          sql
-        end
       end
 
       # We can't dump @reflection since it contains the scope proc
@@ -274,7 +268,7 @@ module ActiveRecord
         end
 
         # Returns true if statement cache should be skipped on the association reader.
-        def skip_statement_cache?
+        def skip_statement_cache?(scope)
           reflection.has_scope? ||
             scope.eager_loading? ||
             klass.scope_attributes? ||

@@ -62,7 +62,7 @@ module ActiveRecord
         def quote_default_expression(value, column) # :nodoc:
           if value.is_a?(Proc)
             value.call
-          elsif column.type == :uuid && value.include?("()")
+          elsif column.type == :uuid && /\(\)/.match?(value)
             value # Does not quote function default values for UUID columns
           elsif column.respond_to?(:array?)
             value = type_cast_from_column(column, value)
@@ -78,7 +78,7 @@ module ActiveRecord
 
         private
           def lookup_cast_type(sql_type)
-            super(select_value("SELECT #{quote(sql_type)}::regtype::oid", "SCHEMA").to_i)
+            super(query_value("SELECT #{quote(sql_type)}::regtype::oid", "SCHEMA").to_i)
           end
 
           def _quote(value)

@@ -1,12 +1,12 @@
 require "active_support/core_ext/module/attribute_accessors"
-require "rails/test_unit/reporter"
-require "rails/test_unit/test_requirer"
+require_relative "reporter"
+require_relative "test_requirer"
 require "shellwords"
 
 module Minitest
   class SuppressedSummaryReporter < SummaryReporter
     # Disable extra failure output after a run if output is inline.
-    def aggregated_results
+    def aggregated_results(*)
       super unless options[:output_inline]
     end
   end
@@ -134,7 +134,7 @@ module Minitest
     end
   end
 
-  mattr_reader(:run_via) { RunVia.new }
+  mattr_reader :run_via, default: RunVia.new
 end
 
 # Put Rails as the first plugin minitest initializes so other plugins

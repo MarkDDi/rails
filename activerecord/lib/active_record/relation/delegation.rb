@@ -89,6 +89,8 @@ module ActiveRecord
             self.class.delegate_to_scoped_klass(method)
             scoping { @klass.public_send(method, *args, &block) }
           elsif arel.respond_to?(method)
+            ActiveSupport::Deprecation.warn \
+              "Delegating #{method} to arel is deprecated and will be removed in Rails 6.0."
             self.class.delegate method, to: :arel
             arel.public_send(method, *args, &block)
           else
@@ -109,21 +111,9 @@ module ActiveRecord
         end
     end
 
-    def respond_to_missing?(method, include_private = false)
-      super || @klass.respond_to?(method, include_private) ||
-        arel.respond_to?(method, include_private)
-    end
-
     private
-
-      def method_missing(method, *args, &block)
-        if @klass.respond_to?(method)
-          scoping { @klass.public_send(method, *args, &block) }
-        elsif arel.respond_to?(method)
-          arel.public_send(method, *args, &block)
-        else
-          super
-        end
+      def respond_to_missing?(method, _)
+        super || @klass.respond_to?(method) || arel.respond_to?(method)
       end
   end
 end

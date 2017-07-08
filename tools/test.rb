@@ -7,11 +7,12 @@ require "rails/test_unit/minitest_plugin"
 require "rails/test_unit/line_filtering"
 require "active_support/test_case"
 
-module Rails
-  # Necessary to get rerun-snippts working.
-  def self.root
+class << Rails
+  # Necessary to get rerun-snippets working.
+  def root
     @root ||= Pathname.new(COMPONENT_ROOT)
   end
+  alias __root root
 end
 
 ActiveSupport::TestCase.extend Rails::LineFiltering

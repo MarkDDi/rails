@@ -241,6 +241,13 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     assert_equal "defaulty", bulb.name
   end
 
+  def test_build_from_association_sets_inverse_instance
+    car = Car.new(name: "honda")
+
+    bulb = car.bulbs.build
+    assert_equal car, bulb.car
+  end
+
   def test_do_not_call_callbacks_for_delete_all
     car = Car.create(name: "honda")
     car.funky_bulbs.create!
@@ -739,6 +746,41 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     client2 = Client.find(2)
     assert_equal client2, firm.clients.merge!(where: ["#{QUOTED_TYPE} = ?", "Client"], order: "id").first
     assert_equal client2, firm.clients.merge!(where: ["#{QUOTED_TYPE} = :type", { type: "Client" }], order: "id").first
+  end
+
+  def test_find_first_after_reset_scope
+    firm = Firm.all.merge!(order: "id").first
+    collection = firm.clients
+
+    original_object = collection.first
+    assert_same original_object, collection.first, "Expected second call to #first to cache the same object"
+
+    # It should return a different object, since the association has been reloaded
+    assert_not_same original_object, firm.clients.first, "Expected #first to return a new object"
+  end
+
+  def test_find_first_after_reset
+    firm = Firm.all.merge!(order: "id").first
+    collection = firm.clients
+
+    original_object = collection.first
+    assert_same original_object, collection.first, "Expected second call to #first to cache the same object"
+    collection.reset
+
+    # It should return a different object, since the association has been reloaded
+    assert_not_same original_object, collection.first, "Expected #first after #reset to return a new object"
+  end
+
+  def test_find_first_after_reload
+    firm = Firm.all.merge!(order: "id").first
+    collection = firm.clients
+
+    original_object = collection.first
+    assert_same original_object, collection.first, "Expected second call to #first to cache the same object"
+    collection.reload
+
+    # It should return a different object, since the association has been reloaded
+    assert_not_same original_object, collection.first, "Expected #first after #reload to return a new object"
   end
 
   def test_find_all_with_include_and_conditions
@@ -1355,7 +1397,7 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     Client.create(client_of: firm.id, name: "SmallTime Inc.")
     # only one of two clients is included in the association due to the :conditions key
     assert_equal 2, Client.where(client_of: firm.id).size
-    assert_equal 1, firm.dependent_sanitized_conditional_clients_of_firm.size
+    assert_equal 1, firm.dependent_hash_conditional_clients_of_firm.size
     firm.destroy
     # only the correctly associated client should have been deleted
     assert_equal 1, Client.where(client_of: firm.id).size
@@ -2037,12 +2079,6 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     assert_equal client_association.new.attributes, client_association.send(:new).attributes
   end
 
-  def test_respond_to_private_class_methods
-    client_association = companies(:first_firm).clients
-    assert !client_association.respond_to?(:private_method)
-    assert client_association.respond_to?(:private_method, true)
-  end
-
   def test_creating_using_primary_key
     firm = Firm.all.merge!(order: "id").first
     client = firm.clients_using_primary_key.create!(name: "test")
@@ -2144,6 +2180,13 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
 
     assert_equal welcome.id, tagging.taggable_id
     assert_equal "Post", tagging.taggable_type
+  end
+
+  def test_build_from_polymorphic_association_sets_inverse_instance
+    post = Post.new
+    tagging = post.taggings.build
+
+    assert_equal post, tagging.taggable
   end
 
   def test_dont_call_save_callbacks_twice_on_has_many
@@ -2257,7 +2300,15 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
   test "association with extend option with multiple extensions" do
     post = posts(:welcome)
     assert_equal "lifo",  post.comments_with_extend_2.author
-    assert_equal "hello", post.comments_with_extend_2.greeting
+    assert_equal "hullo", post.comments_with_extend_2.greeting
+  end
+
+  test "extend option affects per association" do
+    post = posts(:welcome)
+    assert_equal "lifo",  post.comments_with_extend.author
+    assert_equal "lifo",  post.comments_with_extend_2.author
+    assert_equal "hello", post.comments_with_extend.greeting
+    assert_equal "hullo", post.comments_with_extend_2.greeting
   end
 
   test "delete record with complex joins" do
@@ -2317,8 +2368,9 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     car = Car.create!
     bulb = Bulb.create! name: "other", car: car
 
-    assert_equal bulb, Car.find(car.id).all_bulbs.first
-    assert_equal bulb, Car.includes(:all_bulbs).find(car.id).all_bulbs.first
+    assert_equal [bulb], Car.find(car.id).all_bulbs
+    assert_equal [bulb], Car.includes(:all_bulbs).find(car.id).all_bulbs
+    assert_equal [bulb], Car.eager_load(:all_bulbs).find(car.id).all_bulbs
   end
 
   test "raises RecordNotDestroyed when replaced child can't be destroyed" do
@@ -2447,12 +2499,26 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     assert_equal [first_bulb, second_bulb], car.bulbs
   end
 
-  test "double insertion of new object to association when same association used in the after create callback of a new object" do
+  test "prevent double insertion of new object when the parent association loaded in the after save callback" do
     reset_callbacks(:save, Bulb) do
       Bulb.after_save { |record| record.car.bulbs.load }
+
       car = Car.create!
       car.bulbs << Bulb.new
+
       assert_equal 1, car.bulbs.size
+    end
+  end
+
+  test "prevent double firing the before save callback of new object when the parent association saved in the callback" do
+    reset_callbacks(:save, Bulb) do
+      count = 0
+      Bulb.before_save { |record| record.car.save && count += 1 }
+
+      car = Car.create!
+      car.bulbs.create!
+
+      assert_equal 1, count
     end
   end
 
@@ -2492,11 +2558,16 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
 
     assert_equal [bulb.id], car.bulb_ids
     assert_no_queries { car.bulb_ids }
+
+    bulb2 = car.bulbs.create!
+
+    assert_equal [bulb.id, bulb2.id], car.bulb_ids
+    assert_no_queries { car.bulb_ids }
   end
 
   def test_loading_association_in_validate_callback_doesnt_affect_persistence
     reset_callbacks(:validation, Bulb) do
-      Bulb.after_validation { |m| m.car.bulbs.load }
+      Bulb.after_validation { |record| record.car.bulbs.load }
 
       car = Car.create!(name: "Car")
       bulb = car.bulbs.create!
